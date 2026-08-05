@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <!--
+      Thin orchestrator only. All schema changes live as plain-SQL changesets in
+      ./changesets and are applied in filename order, so use a sortable,
+      zero-padded prefix: 0001_create_ping.sql, 0002_add_xyz.sql. Each .sql file
+      begins with a Liquibase formatted-SQL header line ("liquibase formatted
+      sql") followed by one "changeset author:id" line per change, and ends with
+      its own "rollback" line(s). (Those header lines use a double-dash prefix,
+      which cannot be shown inside this XML comment.)
+
+      Only put changesets in ./changesets - includeAll runs every .sql it finds
+      there as a forward migration.
+    -->
+    <includeAll path="changesets/" relativeToChangelogFile="true" />
+</databaseChangeLog>
