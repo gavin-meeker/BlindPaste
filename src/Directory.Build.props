@@ -1,0 +1,8 @@
+<Project>
+
+  <!-- Imported automatically by every .NET project under src/. -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

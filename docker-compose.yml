@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: blindpaste-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-blindpaste}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blindpaste}
+      POSTGRES_DB: ${POSTGRES_DB:-blindpaste}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # postgres:18+ declares the volume at /var/lib/postgresql (PGDATA is /var/lib/postgresql/18/docker)
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-blindpaste} -d ${POSTGRES_DB:-blindpaste}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  liquibase:
+    # The 5.x images ship without a Postgres JDBC driver, so the Dockerfile
+    # bakes it in with `lpm add postgresql` at build time (no runtime fetch).
+    build:
+      context: ./database
+      dockerfile: liquibase.Dockerfile
+    image: blindpaste-liquibase:5.0.3
+    container_name: blindpaste-liquibase
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database/changelog:/liquibase/changelog
+    command:
+      - --search-path=/liquibase/changelog
+      - --changelog-file=changelog-master.xml
+      - --url=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-blindpaste}
+      - --username=${POSTGRES_USER:-blindpaste}
+      - --password=${POSTGRES_PASSWORD:-blindpaste}
+      - update
+    # Runs once and exits; do not resurrect it.
+    restart: "no"
+
+volumes:
+  postgres-data:
