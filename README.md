@@ -24,7 +24,10 @@ BlindPaste/
 ├─ database/
 │  ├─ changelog/          # Liquibase master + plain-SQL changesets (owns the schema)
 │  └─ liquibase.Dockerfile
+├─ scripts/               # developer setup / maintenance scripts (see below)
 ├─ docker-compose.yml     # postgres + liquibase (one-shot migration)
+├─ .nvmrc                 # pins Node (nvm use)
+├─ .editorconfig          # shared formatting rules
 └─ global.json            # pins the .NET SDK
 ```
 
@@ -54,6 +57,17 @@ No local setup step is required: the dev connection string and dev-server settin
 committed (see [Configuration](#configuration)). `.env` is optional — `docker-compose.yml`
 falls back to the same defaults `.env.example` documents, so copy it only if you want to
 change the Postgres credentials or port.
+
+Node is pinned in `.nvmrc`, so `nvm use` in the repo root picks the right version.
+
+## Scripts
+
+`scripts/` holds developer setup and maintenance scripts. Each one documents at the top
+what it does and what it unlocks, so start there rather than here.
+
+| Script | What it's for |
+|--------|---------------|
+| `scripts/setup-env.sh` | Copies every committed `*.example` template to its real filename (`.env.example` → `.env`), never overwriting an existing file. Gives you local, gitignored files to edit instead of the tracked defaults. Safe to re-run after a pull that adds a template. |
 
 ## Configuration
 
