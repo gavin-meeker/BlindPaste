@@ -12,6 +12,17 @@
 
       Only put changesets in ./changesets - includeAll runs every .sql it finds
       there as a forward migration.
+
+      Every changeset must be idempotent: running the file a second time against a
+      database that already has it must succeed and change nothing. Use CREATE TABLE
+      IF NOT EXISTS, CREATE INDEX IF NOT EXISTS, ALTER TABLE ... ADD COLUMN IF NOT
+      EXISTS, and seed rows with INSERT ... WHERE NOT EXISTS or ON CONFLICT DO
+      NOTHING. Liquibase's own tracking table already stops a changeset running twice
+      in normal operation, so this is about the cases where that tracking is not in
+      play - a restored database, a hand-run file, a cleared checksum, and the test
+      fixture in tests/BlindPaste.Api.Tests, which applies these files directly. There
+      is a test that applies every changeset twice and fails if one of them is not
+      idempotent.
     -->
     <includeAll path="changesets/" relativeToChangelogFile="true" />
 </databaseChangeLog>
