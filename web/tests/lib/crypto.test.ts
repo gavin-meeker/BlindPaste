@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { base64urlToBytes, bytesToBase64url } from '@/lib/base64url'
-import { decryptText, encryptText, KEY_BYTES } from '@/lib/crypto'
+import { decryptText, encryptText, InsecureContextError, KEY_BYTES } from '@/lib/crypto'
 import { DecryptFailedError, MalformedKeyError, MalformedPayloadError } from '@/lib/errors'
-import { HEADER_BYTES, IV_BYTES, SALT_BYTES } from '@/lib/payload'
+import { HEADER_BYTES, IV_BYTES, SALT_BYTES, unpackPayload } from '@/lib/payload'
 
 function flipByteAt(payload: string, index: number): string {
   const bytes = base64urlToBytes(payload)
@@ -42,6 +42,31 @@ describe('round-trip', () => {
     const { key, payload } = await encryptText(text)
 
     expect(await decryptText(payload, key)).toBe(text)
+  })
+})
+
+describe('null passphrase', () => {
+  // `new FormData(form).get('passphrase')` is typed `string | null`, so a null
+  // reaches these functions on an ordinary React path. It must mean "no
+  // passphrase". If it were encoded instead, TextEncoder would stringify it to
+  // the literal "null" and produce a paste nobody — including the creator, who
+  // was never asked for a passphrase — could ever decrypt.
+  it('encrypts with null exactly as it does with no passphrase', async () => {
+    const { key, payload } = await encryptText('attack at dawn', null)
+
+    expect(await decryptText(payload, key)).toBe('attack at dawn')
+  })
+
+  it('decrypts with null exactly as it does with no passphrase', async () => {
+    const { key, payload } = await encryptText('attack at dawn')
+
+    expect(await decryptText(payload, key, null)).toBe('attack at dawn')
+  })
+
+  it('does not treat null as the passphrase "null"', async () => {
+    const { key, payload } = await encryptText('attack at dawn', null)
+
+    await expect(decryptText(payload, key, 'null')).rejects.toThrow(DecryptFailedError)
   })
 })
 
@@ -163,6 +188,90 @@ describe('bad inputs', () => {
     const shortKey = bytesToBase64url(new Uint8Array(16))
 
     await expect(decryptText(payload, shortKey)).rejects.toThrow(MalformedKeyError)
+  })
+})
+
+describe('additional authenticated data', () => {
+  // Guards the `additionalData` argument specifically, and is the only test that
+  // does. Every test in `tampering` above would still pass if AAD were dropped
+  // from crypto.ts, because each corrupted byte also breaks something else: a
+  // changed salt changes the derived key, a changed IV changes GCM's IV, a
+  // changed ciphertext or tag fails the tag, and a changed version is rejected
+  // before decryption runs. Do not fold this into those tests.
+  it('will not decrypt without the header as AAD', async () => {
+    const { key, payload } = await encryptText('aad matters')
+    const { salt, iv, ciphertext, header } = unpackPayload(payload)
+
+    // Re-derive the same key the library used. With no passphrase the KDF input
+    // is the key bytes alone. The iterations are fixed by the wire format.
+    const baseKey = await crypto.subtle.importKey(
+      'raw',
+      base64urlToBytes(key),
+      'PBKDF2',
+      false,
+      ['deriveKey'],
+    )
+    const derivedKey = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 600_000, hash: 'SHA-256' },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt'],
+    )
+
+    // Correct key, correct IV, no additionalData. This can only succeed if
+    // encryption did not authenticate the header either.
+    await expect(
+      crypto.subtle.decrypt({ name: 'AES-GCM', iv }, derivedKey, ciphertext),
+    ).rejects.toThrow()
+
+    // The same call *with* the header succeeds — so the rejection above is about
+    // the missing AAD and not a mistake in this test's key derivation.
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData: header },
+      derivedKey,
+      ciphertext,
+    )
+
+    expect(new TextDecoder().decode(plaintext)).toBe('aad matters')
+  })
+})
+
+describe('insecure context', () => {
+  // crypto.subtle exists only in a secure context, so a self-hosted instance
+  // opened at http://192.168.x.x:5173 has no Web Crypto at all. Without a guard
+  // the first subtle call throws "Cannot read properties of undefined", which the
+  // UI cannot classify.
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('reports a missing crypto global', async () => {
+    vi.stubGlobal('crypto', undefined)
+
+    await expect(encryptText('secret')).rejects.toThrow(InsecureContextError)
+    await expect(decryptText('anything', 'anything')).rejects.toThrow(InsecureContextError)
+  })
+
+  it('reports a crypto global without subtle', async () => {
+    // What a browser actually exposes over plain HTTP: getRandomValues is there,
+    // subtle is not.
+    vi.stubGlobal('crypto', { getRandomValues: <T>(array: T): T => array })
+
+    await expect(encryptText('secret')).rejects.toThrow(InsecureContextError)
+    await expect(decryptText('anything', 'anything')).rejects.toThrow(InsecureContextError)
+  })
+
+  it('checks before parsing, so a bad payload still reports the real problem', async () => {
+    vi.stubGlobal('crypto', undefined)
+
+    // 'not a payload!' would be a MalformedPayloadError in a secure context. The
+    // environment is the actual fault, so that is what the caller must see.
+    await expect(decryptText('not a payload!', 'not a key!')).rejects.toThrow(InsecureContextError)
+  })
+
+  it('restores the global, so later tests still have real crypto', () => {
+    expect(globalThis.crypto.subtle).toBeDefined()
   })
 })
 

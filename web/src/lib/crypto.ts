@@ -11,8 +11,19 @@
 // localhost.
 
 import { base64urlToBytes, bytesToBase64url } from './base64url'
-import { DecryptFailedError, MalformedKeyError } from './errors'
+import { DecryptFailedError, InsecureContextError, MalformedKeyError } from './errors'
 import { buildHeader, IV_BYTES, packPayload, SALT_BYTES, unpackPayload } from './payload'
+
+// Re-exported so a consumer needs one import path. A viewer has to catch
+// DecryptFailedError to tell "wrong passphrase, try again" from "this link is
+// broken", which is the entire reason these are separate classes. errors.ts
+// stays the definition site.
+export {
+  DecryptFailedError,
+  InsecureContextError,
+  MalformedKeyError,
+  MalformedPayloadError,
+} from './errors'
 
 export const KEY_BYTES = 32
 
@@ -29,6 +40,23 @@ export type EncryptResult = {
 }
 
 /**
+ * Fails early and legibly when Web Crypto is missing.
+ *
+ * `crypto.subtle` only exists in a secure context, so a page served over plain
+ * HTTP from anything but localhost — a self-hosted instance reached at
+ * `http://192.168.1.10:5173`, say — has no crypto at all. Without this the first
+ * `crypto.subtle.importKey` throws a TypeError about reading a property of
+ * undefined, which no caller can sensibly classify.
+ */
+function assertSecureContext(): void {
+  if (!globalThis.crypto?.subtle) {
+    throw new InsecureContextError(
+      'Web Crypto is unavailable. BlindPaste needs a secure context — serve the page over HTTPS or from localhost.',
+    )
+  }
+}
+
+/**
  * Stretches the random key and passphrase into one AES-GCM key.
  *
  * This runs whether or not a passphrase was supplied. Skipping it when there is
@@ -39,7 +67,7 @@ export type EncryptResult = {
 async function deriveKey(
   keyBytes: Uint8Array,
   passphrase: string,
-  salt: Uint8Array,
+  salt: Uint8Array<ArrayBuffer>,
 ): Promise<CryptoKey> {
   const passphraseBytes = new TextEncoder().encode(passphrase)
 
@@ -50,14 +78,8 @@ async function deriveKey(
 
   const baseKey = await crypto.subtle.importKey('raw', material, 'PBKDF2', false, ['deriveKey'])
 
-  // TypeScript's DOM lib types BufferSource as requiring an ArrayBuffer-backed
-  // view specifically, but `salt` here (like every Uint8Array this module
-  // receives from payload.ts) is typed as the more general ArrayBufferLike. A
-  // fresh copy is concretely ArrayBuffer-backed and satisfies the stricter type;
-  // the copy is a few bytes and irrelevant to performance next to 600k PBKDF2
-  // rounds.
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: new Uint8Array(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     baseKey,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -65,15 +87,28 @@ async function deriveKey(
   )
 }
 
+/**
+ * `passphrase` accepts null as well as undefined and treats both as "none".
+ * `new FormData(form).get('passphrase')` yields `string | null`, and a null that
+ * reached the encoder would stringify to the literal "null" — creating a paste
+ * the UI believes is unprotected and that nobody can ever decrypt.
+ *
+ * Note on text: TextEncoder replaces an unpaired surrogate with U+FFFD, so a
+ * string containing one (`'a\uD83D b'`) does not round-trip byte-for-byte. That
+ * is inherent to encoding as UTF-8; such strings are not valid text and every
+ * alternative encoding is worse.
+ */
 export async function encryptText(
   plaintext: string,
-  passphrase = '',
+  passphrase?: string | null,
 ): Promise<EncryptResult> {
+  assertSecureContext()
+
   const keyBytes = crypto.getRandomValues(new Uint8Array(KEY_BYTES))
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES))
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
 
-  const derivedKey = await deriveKey(keyBytes, passphrase, salt)
+  const derivedKey = await deriveKey(keyBytes, passphrase ?? '', salt)
 
   // The header is authenticated but not encrypted, so altering the version, salt
   // or iv fails decryption instead of silently changing how it is interpreted.
@@ -81,7 +116,7 @@ export async function encryptText(
 
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv, additionalData: new Uint8Array(header) },
+      { name: 'AES-GCM', iv, additionalData: header },
       derivedKey,
       new TextEncoder().encode(plaintext),
     ),
@@ -93,32 +128,35 @@ export async function encryptText(
   }
 }
 
+/** As with `encryptText`, a null passphrase means "none" rather than "null". */
 export async function decryptText(
   payload: string,
   key: string,
-  passphrase = '',
+  passphrase?: string | null,
 ): Promise<string> {
+  assertSecureContext()
+
   const { salt, iv, ciphertext, header } = unpackPayload(payload)
 
-  let keyBytes: Uint8Array
+  let keyBytes: Uint8Array<ArrayBuffer>
   try {
     keyBytes = base64urlToBytes(key)
-  } catch {
-    throw new MalformedKeyError('Key is not valid base64url.')
+  } catch (err) {
+    throw new MalformedKeyError('Key is not valid base64url.', { cause: err })
   }
 
   if (keyBytes.length !== KEY_BYTES) {
     throw new MalformedKeyError(`Key is ${keyBytes.length} bytes; expected ${KEY_BYTES}.`)
   }
 
-  const derivedKey = await deriveKey(keyBytes, passphrase, salt)
+  const derivedKey = await deriveKey(keyBytes, passphrase ?? '', salt)
 
   let plaintextBytes: ArrayBuffer
   try {
     plaintextBytes = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: new Uint8Array(iv), additionalData: new Uint8Array(header) },
+      { name: 'AES-GCM', iv, additionalData: header },
       derivedKey,
-      new Uint8Array(ciphertext),
+      ciphertext,
     )
   } catch {
     // A wrong key, a wrong passphrase and a tampered payload all land here and

@@ -66,4 +66,42 @@ describe('base64urlToBytes', () => {
     // A base64 body can never be 1 more than a multiple of 4 characters.
     expect(() => base64urlToBytes('abcde')).toThrow()
   })
+
+  it('accepts only the canonical encoding of a byte string', () => {
+    // A 7-character body encodes 5 bytes; the last character carries 2 bits of
+    // data and 2 spare bits that a lenient decoder ignores. All four of these
+    // would otherwise decode to the same "Hello", making the encoding
+    // many-to-one — so payload strings could not be compared for identity, and
+    // strict decoders elsewhere would reject what this module produced.
+    expect(base64urlToBytes('SGVsbG8')).toEqual(
+      new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f]),
+    )
+    expect(() => base64urlToBytes('SGVsbG9')).toThrow()
+    expect(() => base64urlToBytes('SGVsbG-')).toThrow()
+    expect(() => base64urlToBytes('SGVsbG_')).toThrow()
+  })
+
+  it('accepts only the canonical encoding of a single byte', () => {
+    // A 2-character body encodes 1 byte, leaving 4 spare bits, so only the four
+    // final characters whose low 4 bits are zero are canonical.
+    for (const canonical of ['AA', 'AQ', 'Ag', 'Aw']) {
+      expect(() => base64urlToBytes(canonical)).not.toThrow()
+    }
+
+    for (const nonCanonical of ['AB', 'AC', 'AP', 'A_']) {
+      expect(() => base64urlToBytes(nonCanonical)).toThrow()
+    }
+  })
+
+  it('accepts everything it encodes', () => {
+    // The canonical check must never reject this module's own output.
+    for (let length = 0; length <= 16; length += 1) {
+      const bytes = new Uint8Array(length)
+      for (let i = 0; i < length; i += 1) {
+        bytes[i] = 0xff
+      }
+
+      expect(() => base64urlToBytes(bytesToBase64url(bytes))).not.toThrow()
+    }
+  })
 })

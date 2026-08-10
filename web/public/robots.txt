@@ -1,0 +1,10 @@
+# A BlindPaste link carries its decryption key in the URL fragment. A crawler that
+# follows, indexes, or archives such a link has published the paste — the server
+# never saw the key, but the crawler did. Nothing here is meant to be indexed.
+#
+# This is a request, not a control. Bots that ignore robots.txt exist, which is why
+# the API also sends X-Robots-Tag on every response. Neither stops a crawler that
+# has already been handed a link.
+
+User-agent: *
+Disallow: /

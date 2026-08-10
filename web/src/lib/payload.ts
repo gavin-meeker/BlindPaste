@@ -27,16 +27,20 @@ const IV_OFFSET = SALT_OFFSET + SALT_BYTES
 // Even an empty plaintext produces a 16-byte GCM tag.
 const MIN_PAYLOAD_BYTES = HEADER_BYTES + TAG_BYTES
 
+// The views below are annotated Uint8Array<ArrayBuffer> rather than plain
+// Uint8Array because Web Crypto's BufferSource requires a concretely
+// ArrayBuffer-backed view. Every one of these is already backed by an
+// ArrayBuffer; saying so lets crypto.ts pass them straight through.
 export type UnpackedPayload = {
   version: number
-  salt: Uint8Array
-  iv: Uint8Array
-  ciphertext: Uint8Array
+  salt: Uint8Array<ArrayBuffer>
+  iv: Uint8Array<ArrayBuffer>
+  ciphertext: Uint8Array<ArrayBuffer>
   /** version, salt and iv as one slice — passed to AES-GCM as authenticated data. */
-  header: Uint8Array
+  header: Uint8Array<ArrayBuffer>
 }
 
-export function buildHeader(salt: Uint8Array, iv: Uint8Array): Uint8Array {
+export function buildHeader(salt: Uint8Array, iv: Uint8Array): Uint8Array<ArrayBuffer> {
   const header = new Uint8Array(HEADER_BYTES)
   header[0] = PAYLOAD_VERSION
   header.set(salt, SALT_OFFSET)
@@ -54,11 +58,11 @@ export function packPayload(header: Uint8Array, ciphertext: Uint8Array): string 
 }
 
 export function unpackPayload(payload: string): UnpackedPayload {
-  let bytes: Uint8Array
+  let bytes: Uint8Array<ArrayBuffer>
   try {
     bytes = base64urlToBytes(payload)
-  } catch {
-    throw new MalformedPayloadError('Payload is not valid base64url.')
+  } catch (err) {
+    throw new MalformedPayloadError('Payload is not valid base64url.', { cause: err })
   }
 
   if (bytes.length < MIN_PAYLOAD_BYTES) {

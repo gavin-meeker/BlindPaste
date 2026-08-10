@@ -4,7 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>web</title>
+    <!-- The decryption key rides in the URL fragment, so an indexed paste link is a
+         published paste. Says the same thing as public/robots.txt, to crawlers that
+         read the page but not the site root. -->
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>BlindPaste</title>
   </head>
   <body>
     <div id="root"></div>
