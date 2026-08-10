@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/BlindPaste.Api/BlindPaste.Api.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BlindPaste.Api.Tests/BlindPaste.Api.Tests.csproj" />
+  </Folder>
 </Solution>
