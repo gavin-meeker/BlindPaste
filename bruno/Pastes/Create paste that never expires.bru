@@ -31,6 +31,9 @@ assert {
 }
 
 tests {
+  // bru.sendRequest is axios under the hood: the body goes under `data` on the way in,
+  // and the response body comes back as `.data`, not `.body` — different from `res` in
+  // an ordinary request/assert block, which is Bruno's own wrapper with `.getBody()`.
   test("a stored paste with no expiry reports none on read too", async function () {
     const read = await bru.sendRequest({
       method: "GET",
@@ -38,7 +41,7 @@ tests {
     });
 
     expect(read.status).to.equal(200);
-    expect(read.body.expiresAt).to.equal(null);
+    expect(read.data.expiresAt).to.equal(null);
   });
 
   test("neverExpires overrides an expiresInSeconds that would otherwise be rejected", async function () {
@@ -49,18 +52,15 @@ tests {
       method: "POST",
       url: `${bru.getEnvVar("baseUrl")}/api/pastes`,
       headers: { "content-type": "application/json" },
-      body: {
-        mode: "json",
-        json: {
-          payload: bru.getVar("freshPayload"),
-          expiresInSeconds: 99999999,
-          neverExpires: true
-        }
+      data: {
+        payload: bru.getVar("freshPayload"),
+        expiresInSeconds: 99999999,
+        neverExpires: true
       }
     });
 
     expect(created.status).to.equal(201);
-    expect(created.body.expiresAt).to.equal(null);
+    expect(created.data.expiresAt).to.equal(null);
   });
 }
 

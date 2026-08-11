@@ -25,13 +25,15 @@ export class ApiError extends Error {
 
 export type CreatePasteResult = {
   id: string
-  expiresAt: string
+  /** Null means the paste never expires. */
+  expiresAt: string | null
   burnAfterReading: boolean
 }
 
 export type Paste = {
   payload: string
-  expiresAt: string
+  /** Null means the paste never expires. */
+  expiresAt: string | null
   burnAfterReading: boolean
 }
 
@@ -71,8 +73,10 @@ async function toError(response: Response): Promise<Error> {
 
 export async function createPaste(request: {
   payload: string
-  expiresInSeconds: number
+  /** Omit, alongside `neverExpires: true`, to request no expiry at all. */
+  expiresInSeconds?: number
   burnAfterReading: boolean
+  neverExpires?: boolean
 }): Promise<CreatePasteResult> {
   const response = await fetch('/api/pastes', {
     method: 'POST',
