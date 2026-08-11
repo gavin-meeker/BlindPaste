@@ -1,0 +1,67 @@
+# Serves the built SPA and reverse-proxies /api/* to the backend over Railway's
+# private network, so the browser only ever sees this one origin. That is what keeps
+# the frontend's existing `fetch('/api/pastes')` calls same-origin in production
+# exactly as they are in dev (vite.config.ts's server.proxy does the same job there) —
+# no build-time API URL baked into the JS bundle, no CORS to configure.
+{
+    admin off          # no need for the admin API in Railway's environment
+    persist_config off # storage is not persistent here anyway
+    auto_https off      # Railway terminates HTTPS at its edge; this would fight it
+
+    log {
+        format json
+    }
+
+    servers {
+        trusted_proxies static private_ranges 100.0.0.0/8 # trust Railway's proxy
+    }
+}
+
+# Listens on Railway's dynamic $PORT, defaulting to 3000 for a local `docker run`
+# with no environment set.
+:{$PORT:3000} {
+    log {
+        format json
+    }
+
+    # `handle` blocks, not bare directives: they are mutually exclusive and evaluated
+    # in the order written, which a flat directive list is not — Caddy sorts bare
+    # directives into its own fixed internal precedence regardless of file order, and
+    # under that ordering `try_files` (below) runs *before* `reverse_proxy` and
+    # rewrites every non-file path, `/api/*` included, to /index.html first. Verified
+    # by actually running it: without explicit `handle` blocks, POST /api/pastes came
+    # back a 405 from the static file server, not proxied at all — `handle` is what
+    # makes "this path goes here, everything else goes there" true rather than
+    # incidental.
+    #
+    # {$API_PRIVATE_URL} must be set as a variable on this service (not hardcoded —
+    # the value only exists once both services are deployed in the same Railway
+    # project). See RAILWAY.md for the exact value to set.
+    handle /api/* {
+        reverse_proxy {$API_PRIVATE_URL}
+    }
+
+    handle {
+        # Railway's healthcheck hits this path; there is no such route in the SPA, so
+        # answer with the app shell instead of a 404.
+        rewrite /health /index.html
+
+        root * /srv
+        encode gzip
+        file_server
+
+        # Client-side routing: an unknown path (e.g. /p/<id>) is not a real file, so
+        # fall through to index.html and let App.tsx's own path matching take it from
+        # there.
+        try_files {path} /index.html
+
+        header {
+            # Same reasoning as the API's X-Robots-Tag: a paste's decryption key lives
+            # in the URL fragment, so an indexed link is a published paste. Scoped to
+            # this handle block only — the api one already gets its own copy straight
+            # from the .NET app, and adding it here too would just duplicate the
+            # header on every proxied response.
+            X-Robots-Tag "noindex, nofollow, noarchive"
+        }
+    }
+}

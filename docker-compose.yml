@@ -27,8 +27,8 @@ services:
     # The 5.x images ship without a Postgres JDBC driver, so the Dockerfile
     # bakes it in with `lpm add postgresql` at build time (no runtime fetch).
     build:
-      context: ./database
-      dockerfile: liquibase.Dockerfile
+      context: .
+      dockerfile: database/liquibase.Dockerfile
     image: blindpaste-liquibase:5.0.3
     container_name: blindpaste-liquibase
     depends_on:
