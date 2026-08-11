@@ -1,1 +1,176 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------------
+   Design tokens.
+
+   Everything the interface is allowed to use lives here, so a change to the palette or
+   the type scale happens in one place. Component styling belongs in markup as utilities
+   (see src/styles/ui.ts for the shared strings) — not in this file.
+   --------------------------------------------------------------------------------- */
+@theme {
+  /* Instrument-panel palette: near-black ink, warm off-white type, one amber accent
+     used sparingly enough that it always means something. Amber is reserved for the
+     key, for warnings, and for the focused control — never for decoration. */
+  --color-ink: #08090a;
+  --color-panel: #101315;
+  --color-raised: #171b1e;
+  --color-line: #23292e;
+  --color-line-bright: #333b42;
+  --color-text: #e7e4de;
+  --color-muted: #868d94;
+  --color-accent: #ffb02e;
+  --color-danger: #ff6a55;
+  --color-glow: #12171b;
+
+  /* No webfonts on purpose: a tool whose claim is "the server cannot read this" should
+     not make a third-party request on every page load. Mono carries the interface, a
+     neutral sans carries prose — the one place mono would make the product worse. */
+  --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  --font-sans: ui-sans-serif, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+
+  /* Deliberately smaller than Tailwind's defaults, which are tuned for sans body copy.
+     This UI is dense and monospaced, where the same pixel size reads noticeably larger.
+     Redefining the scale keeps `text-sm` meaningful instead of scattering `text-[12px]`
+     through the markup. */
+  --text-2xs: 0.625rem; /* 10px — micro-labels */
+  --text-xs: 0.6875rem; /* 11px — captions, footnotes */
+  --text-sm: 0.75rem; /* 12px — buttons, controls */
+  --text-base: 0.8125rem; /* 13px — body */
+  --text-lg: 0.9375rem; /* 15px — wordmark, rendered prose */
+
+  --tracking-ui: 0.12em;
+  --tracking-label: 0.18em;
+  --tracking-brand: 0.2em;
+
+  /* One page-load reveal. High impact once, rather than scattered micro-interactions. */
+  --animate-reveal: reveal 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+
+    /* A faint scanline over a cold top-light. Enough texture that the background reads
+       as a surface rather than an empty div, subtle enough to disappear while reading. */
+    background-image:
+      radial-gradient(120% 80% at 50% -20%, var(--color-glow) 0%, transparent 60%),
+      repeating-linear-gradient(
+        0deg,
+        rgb(255 255 255 / 0.014) 0px,
+        rgb(255 255 255 / 0.014) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Blanket rather than per-animation: covers the reveal, every `transition-colors`,
+     and anything added later without having to remember this file exists. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------------
+   Third-party: @uiw/react-md-editor.
+
+   Deliberately unlayered. Tailwind's layers all lose to unlayered CSS, which is what
+   makes these overrides stick against a stylesheet we do not control and whose
+   injection order we cannot rely on. Nothing of ours belongs below this line — if a
+   rule here is not overriding the editor, it is in the wrong file.
+   --------------------------------------------------------------------------------- */
+
+/* The editor reads GitHub's palette variables. Repointing them at our tokens restyles
+   both panes without fighting individual rules. Scoped to the editor's own roots rather
+   than :root, because names this generic have no business in the global namespace. */
+.w-md-editor,
+.wmde-markdown {
+  --color-canvas-default: var(--color-panel);
+  --color-canvas-subtle: var(--color-raised);
+  --color-border-default: var(--color-line);
+  --color-border-muted: var(--color-line);
+  --color-fg-default: var(--color-text);
+  --color-fg-muted: var(--color-muted);
+  --color-accent-fg: var(--color-accent);
+  --md-editor-font-family: var(--font-mono);
+}
+
+.w-md-editor {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xs);
+  box-shadow: none;
+}
+
+.w-md-editor-toolbar {
+  background: var(--color-raised);
+  border-bottom: 1px solid var(--color-line);
+}
+
+/* The editing surface is two stacked layers: a transparent <textarea> that owns the
+   caret and selection, and a <pre> underneath that paints the highlighted text. They
+   only line up while their font metrics are byte-for-byte identical — family, size,
+   line-height, letter-spacing, tab-size. Change one layer and the caret drifts a
+   fraction per character, so by the end of a line it sits visibly short of the text.
+
+   The library sets 14px/18px with !important on both layers, so overriding needs
+   greater specificity — hence the `.w-md-editor` prefix, which also makes this
+   independent of injection order. Every metric must stay on this one shared rule. */
+.w-md-editor .w-md-editor-text,
+.w-md-editor .w-md-editor-text-pre,
+.w-md-editor .w-md-editor-text-input,
+.w-md-editor .w-md-editor-text-pre > code {
+  font-family: var(--font-mono) !important;
+  font-size: var(--text-base) !important;
+  line-height: 1.55 !important;
+  letter-spacing: normal !important;
+  tab-size: 2 !important;
+}
+
+/* Rendered paste bodies read as prose, so they get the sans stack. */
+.wmde-markdown {
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+}
+
+.wmde-markdown code,
+.wmde-markdown pre {
+  font-family: var(--font-mono);
+}
