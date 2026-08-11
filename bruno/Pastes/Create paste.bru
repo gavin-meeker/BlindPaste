@@ -1,0 +1,67 @@
+meta {
+  name: Create paste
+  type: http
+  seq: 1
+  tags: [
+    smoke
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "payload": "{{freshPayload}}",
+    "expiresInSeconds": 3600,
+    "burnAfterReading": false
+  }
+}
+
+vars:post-response {
+  pasteId: res.body.id
+}
+
+assert {
+  res.status: 201
+  res.body.id: isDefined
+  res.body.burnAfterReading: false
+}
+
+script:post-response {
+  // Pin the payload that was actually sent. {{freshPayload}} is regenerated before
+  // every request, so by the time "Get paste" runs it holds a different value — this
+  // is what that request compares the stored payload against.
+  bru.setVar("createdPayload", bru.getVar("freshPayload"));
+}
+
+tests {
+  test("id is 22 base64url characters", function () {
+    expect(res.getBody().id).to.match(/^[A-Za-z0-9_-]{22}$/);
+  });
+  
+  test("Location preserves the id's case and matches the body", function () {
+    expect(res.getHeader("location")).to.equal(`/api/pastes/${res.getBody().id}`);
+  });
+  
+  test("expiry is roughly the hour that was asked for", function () {
+    const seconds = (new Date(res.getBody().expiresAt) - Date.now()) / 1000;
+    expect(seconds).to.be.within(3500, 3600);
+  });
+}
+
+docs {
+  Stores one payload. Only `payload` is required — `expiresInSeconds` falls back to the
+  configured default (1 day) and `burnAfterReading` to `false`.
+  
+  The id in the response is 128 bits of CSPRNG output as 22 base64url characters,
+  generated server-side. It is **case-sensitive** and it is the only thing gating
+  retrieval, so treat it like the secret half of a link.
+  
+  Note the `Location` assertion: it compares the header against the id in the body
+  rather than just checking the header exists. Those two can disagree — see the folder
+  docs.
+}

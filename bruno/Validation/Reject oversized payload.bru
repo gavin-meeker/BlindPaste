@@ -1,0 +1,54 @@
+meta {
+  name: Reject oversized payload
+  type: http
+  seq: 5
+  tags: [
+    validation
+    slow
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+script:pre-request {
+  // One character over the limit, so this lands on the controller's size check rather
+  // than on Kestrel's body limit. Kestrel is configured at MaxPayloadCharacters + 8 KB,
+  // so a much larger body would be refused by the server with a 413 before the action
+  // ever ran — a different rejection, and not the one under test here.
+  const limit = Number(bru.getEnvVar("maxPayloadCharacters"));
+  bru.setVar("oversizedPayload", "A".repeat(limit + 1));
+}
+
+body:json {
+  {
+    "payload": "{{oversizedPayload}}",
+    "expiresInSeconds": 3600,
+    "burnAfterReading": false
+  }
+}
+
+assert {
+  res.status: 400
+  res.body.errors.Payload: isDefined
+}
+
+tests {
+  test("reports both the size sent and the limit", function () {
+    const message = res.getBody().errors.Payload[0];
+    expect(message).to.contain(String(Number(bru.getEnvVar("maxPayloadCharacters")) + 1));
+    expect(message).to.contain(bru.getEnvVar("maxPayloadCharacters"));
+  });
+}
+
+docs {
+  Sends `maxPayloadCharacters + 1` characters. Tagged `slow` because at the default
+  limit that is a 4 MB request body; skip it with `--exclude-tags slow`.
+
+  The `maxPayloadCharacters` environment variable has to match what the API is running
+  with (`Paste__MaxPayloadCharacters`). If they disagree this request either passes for
+  the wrong reason or gets a 413 from Kestrel instead of a 400 from the controller.
+}

@@ -1,0 +1,42 @@
+meta {
+  name: Burn paste - first read
+  type: http
+  seq: 4
+  tags: [
+    smoke
+    burn
+  ]
+}
+
+get {
+  url: {{baseUrl}}/api/pastes/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{burnPasteId}}
+}
+
+assert {
+  res.status: 200
+  res.body.burnAfterReading: true
+}
+
+tests {
+  test("returns the payload that was stored", function () {
+    expect(res.getBody().payload).to.equal(bru.getVar("burnPayload"));
+  });
+
+  test("is not cacheable — a cached copy would outlive the burn", function () {
+    expect(res.getHeader("cache-control")).to.contain("no-store");
+  });
+}
+
+docs {
+  The one read this paste gets. The row is deleted server-side as part of serving it, in
+  the same statement that decides who gets it: the `DELETE`'s row count picks the winner,
+  so two simultaneous readers cannot both receive the ciphertext. See
+  `PasteStore.ReadOnceAsync`, and `PasteStoreTests` for the 12-way concurrent version of
+  that check, which needs a real database and so lives in the xUnit suite rather than here.
+}

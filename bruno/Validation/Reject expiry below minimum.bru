@@ -1,0 +1,47 @@
+meta {
+  name: Reject expiry below minimum
+  type: http
+  seq: 3
+  tags: [
+    validation
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+script:pre-request {
+  // One second under the configured floor — the smallest possible violation, so this
+  // fails only if the boundary itself moved.
+  bru.setVar("belowMinimum", Number(bru.getEnvVar("minExpirySeconds")) - 1);
+}
+
+body:json {
+  {
+    "payload": "{{freshPayload}}",
+    "expiresInSeconds": {{belowMinimum}},
+    "burnAfterReading": false
+  }
+}
+
+assert {
+  res.status: 400
+  res.body.errors.ExpiresInSeconds: isDefined
+}
+
+tests {
+  test("states the accepted range", function () {
+    const message = res.getBody().errors.ExpiresInSeconds[0];
+    expect(message).to.contain(bru.getEnvVar("minExpirySeconds"));
+    expect(message).to.contain(bru.getEnvVar("maxExpirySeconds"));
+  });
+}
+
+docs {
+  Below `PasteOptions.MinExpiry`. The request is **rejected, not clamped** — storing a
+  paste for a different span than the one asked for would be a silent surprise, and the
+  caller would have no way to notice.
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Validation
+  seq: 3
+}
+
+docs {
+  Every way the create endpoint says no. All of these return RFC 7807 ProblemDetails with
+  a 400 and an `errors` object keyed by field name, which is what `ValidationProblem`
+  produces from `ModelState`.
+
+  Two things to know before reading the assertions:
+
+  - **The controller returns on the first problem it finds**, so a request with several
+    faults reports only one. These requests each break exactly one rule for that reason.
+  - **Error keys come from two places and are cased differently.** Keys the controller
+    adds by hand are PascalCase (`Payload`, `ExpiresInSeconds`) because they come from
+    `nameof`; keys the framework adds during model binding are JSON paths
+    (`$.expiresInSeconds`). Anything parsing these has to handle both.
+
+  These requests still consume rate-limit permits — the limiter runs ahead of validation.
+  See the collection docs.
+}

@@ -1,0 +1,45 @@
+meta {
+  name: Reject non-base64url payload
+  type: http
+  seq: 2
+  tags: [
+    validation
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "payload": "not valid base64!!",
+    "expiresInSeconds": 3600,
+    "burnAfterReading": false
+  }
+}
+
+assert {
+  res.status: 400
+  res.body.errors.Payload: isDefined
+}
+
+tests {
+  test("rejects it as base64url rather than as malformed crypto", function () {
+    expect(res.getBody().errors.Payload[0]).to.contain("base64url");
+  });
+}
+
+docs {
+  The only thing the server checks about the payload's contents: that it is base64url.
+  It does **not** check the version byte, the header length, or anything else implied by
+  the layout in `web/src/lib/payload.ts`.
+
+  That restraint is deliberate. A server that knew the minimum length implied by the
+  header would have to be redeployed in step with any change to the crypto parameters;
+  because it does not, that stays a frontend-only change. A payload of `"AQID"` — valid
+  base64url, far too short to be a real paste — is accepted and stored, and only the
+  browser trying to decrypt it will ever notice.
+}

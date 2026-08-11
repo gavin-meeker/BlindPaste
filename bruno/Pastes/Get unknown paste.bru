@@ -1,0 +1,31 @@
+meta {
+  name: Get unknown paste
+  type: http
+  seq: 7
+  tags: [
+    smoke
+  ]
+}
+
+get {
+  url: {{baseUrl}}/api/pastes/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  @description('''Well-formed and 22 characters, but never issued.''')
+  id: zzzzzzzzzzzzzzzzzzzzzz
+}
+
+assert {
+  res.status: 404
+}
+
+docs {
+  An id that is shaped correctly but was never issued. Same bare 404 as a burned paste
+  and an expired one — see "Burn paste - second read is gone" for why they are
+  indistinguishable on purpose.
+
+  Guessing your way to a paste is not realistic anyway: the id is 128 bits.
+}

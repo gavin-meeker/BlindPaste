@@ -1,0 +1,52 @@
+meta {
+  name: Burn paste - second read is gone
+  type: http
+  seq: 5
+  tags: [
+    smoke
+    burn
+  ]
+}
+
+get {
+  url: {{baseUrl}}/api/pastes/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{burnPasteId}}
+}
+
+assert {
+  res.status: 404
+}
+
+tests {
+  test("says nothing about the paste having existed", function () {
+    // [ApiController] turns NotFound() into ProblemDetails, so there is a body — it just
+    // has nothing specific in it. Assert on what it does not contain, since that is the
+    // property that matters.
+    const body = res.getBody();
+
+    expect(body.title).to.equal("Not Found");
+    expect(body.status).to.equal(404);
+    expect(body).to.not.have.property("detail");
+    expect(JSON.stringify(body)).to.not.contain(bru.getVar("burnPasteId"));
+  });
+}
+
+docs {
+  Reading a burned paste again is a 404 — the same answer an id that never existed gets,
+  and the same answer an expired one gets.
+
+  That sameness is deliberate. Distinguishing "gone" from "never was" would confirm to
+  someone walking the id space that a paste had once been there, which is information the
+  server should not be handing out.
+
+  The response does carry a body: `[ApiController]` renders `NotFound()` as ProblemDetails,
+  so you get a generic `{"title":"Not Found","status":404}` plus a `traceId`. That is fine
+  — it names no paste and describes no case. The test asserts the absence of a `detail`
+  field and of the id rather than the absence of a body, because a future `NotFound("...")`
+  with a helpful message is the change that would actually leak something.
+}

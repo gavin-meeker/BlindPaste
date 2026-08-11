@@ -1,0 +1,40 @@
+meta {
+  name: Create paste with default expiry
+  type: http
+  seq: 6
+  tags: [
+    smoke
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "payload": "{{freshPayload}}"
+  }
+}
+
+assert {
+  res.status: 201
+  res.body.burnAfterReading: false
+}
+
+tests {
+  test("falls back to the configured default of one day", function () {
+    const hours = (new Date(res.getBody().expiresAt) - Date.now()) / 3600000;
+    expect(hours).to.be.within(23, 25);
+  });
+}
+
+docs {
+  `payload` on its own is a complete request. `expiresInSeconds` falls back to
+  `PasteOptions.DefaultExpiry` (1 day) and `burnAfterReading` to `false`.
+
+  The window in the assertion is wide because it is checking which default was applied,
+  not the clock.
+}

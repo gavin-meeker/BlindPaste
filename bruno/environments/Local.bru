@@ -1,0 +1,16 @@
+vars {
+  @description('''
+    Where the API is listening. Matches applicationUrl in
+    src/BlindPaste.Api/Properties/launchSettings.json.
+  ''')
+  baseUrl: http://localhost:5013
+  @description('''
+    Mirrors PasteOptions.MaxPayloadCharacters. The oversize request sends one character
+    more than this, so it has to match what the API is actually running with.
+  ''')
+  maxPayloadCharacters: 4194304
+  @description('''Mirrors PasteOptions.MinExpiry (1 minute), in seconds.''')
+  minExpirySeconds: 60
+  @description('''Mirrors PasteOptions.MaxExpiry (30 days), in seconds.''')
+  maxExpirySeconds: 2592000
+}

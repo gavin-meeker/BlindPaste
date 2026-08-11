@@ -1,0 +1,45 @@
+meta {
+  name: Reject empty payload
+  type: http
+  seq: 1
+  tags: [
+    validation
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "payload": "",
+    "expiresInSeconds": 3600,
+    "burnAfterReading": false
+  }
+}
+
+assert {
+  res.status: 400
+  res.body.errors.Payload: isDefined
+}
+
+tests {
+  test("is RFC 7807 ProblemDetails", function () {
+    expect(res.getHeader("content-type")).to.contain("application/problem+json");
+    expect(res.getBody().status).to.equal(400);
+    expect(res.getBody().title).to.contain("validation errors");
+  });
+
+  test("names the offending field", function () {
+    expect(res.getBody().errors.Payload[0]).to.contain("required");
+  });
+}
+
+docs {
+  A payload is required. Note this is the controller's own check rather than a
+  `[Required]` attribute — the limits it validates against come from configuration at
+  runtime, and attribute arguments have to be compile-time constants.
+}

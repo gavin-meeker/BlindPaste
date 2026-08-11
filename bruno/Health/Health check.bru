@@ -1,0 +1,31 @@
+meta {
+  name: Health check
+  type: http
+  seq: 1
+  tags: [
+    smoke
+  ]
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: 200
+  res.responseTime: lt 2000
+}
+
+tests {
+  test("reports healthy", function () {
+    expect(res.getBody()).to.equal("Healthy");
+  });
+}
+
+docs {
+  Maps to `AddHealthChecks()` in Program.cs. It answers "is the process up and serving",
+  not "can it reach Postgres" — no database check is registered, so this stays 200 with
+  the database down. A create request is what actually proves the database is reachable.
+}

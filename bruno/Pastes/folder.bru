@@ -1,0 +1,19 @@
+meta {
+  name: Pastes
+  seq: 2
+}
+
+docs {
+  The happy paths, in order. These requests chain: **Create paste** stores the new id in
+  `{{pasteId}}` and **Get paste** reads it back, so run the folder rather than a single
+  request.
+
+  Two behaviours here are worth watching rather than skimming:
+
+  - **The `Location` header is compared against the id in the body.** `RouteOptions.LowercaseUrls`
+    is on, and it lowercases generated links whole — route values included. Paste ids are
+    case-sensitive base64url, so a `Location` built by link generation points at an id that
+    does not exist. That regression is what this assertion exists to catch.
+  - **A burn-after-reading paste is gone the instant it is read**, and the second read is
+    an ordinary 404 — indistinguishable from an id that never existed, which is the point.
+}

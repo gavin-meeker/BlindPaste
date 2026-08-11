@@ -1,0 +1,36 @@
+meta {
+  name: Reject expiry above maximum
+  type: http
+  seq: 4
+  tags: [
+    validation
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+script:pre-request {
+  bru.setVar("aboveMaximum", Number(bru.getEnvVar("maxExpirySeconds")) + 1);
+}
+
+body:json {
+  {
+    "payload": "{{freshPayload}}",
+    "expiresInSeconds": {{aboveMaximum}},
+    "burnAfterReading": false
+  }
+}
+
+assert {
+  res.status: 400
+  res.body.errors.ExpiresInSeconds: isDefined
+}
+
+docs {
+  One second over `PasteOptions.MaxExpiry` (30 days). Same rejection as the floor — the
+  range is a range, not a clamp.
+}

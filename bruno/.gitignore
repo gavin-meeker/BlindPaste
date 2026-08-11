@@ -1,0 +1,12 @@
+# Bruno reads secrets from a .env at the collection root and exposes them as
+# process.env. Nothing here needs one yet — the API has no auth — but if that changes,
+# this is what keeps the secrets out of the repo.
+.env
+
+# Reports written by `bru run --reporter-*`.
+reports/
+*.report.json
+*.report.xml
+*.report.html
+
+node_modules/

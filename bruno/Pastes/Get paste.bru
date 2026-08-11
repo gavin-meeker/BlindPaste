@@ -1,0 +1,63 @@
+meta {
+  name: Get paste
+  type: http
+  seq: 2
+  tags: [
+    smoke
+  ]
+}
+
+get {
+  url: {{baseUrl}}/api/pastes/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  @description('''The id saved by "Create paste".''')
+  id: {{pasteId}}
+}
+
+assert {
+  res.status: 200
+  res.body.burnAfterReading: false
+}
+
+tests {
+  test("returns the exact payload that was stored", function () {
+    expect(res.getBody().payload).to.equal(bru.getVar("createdPayload"));
+  });
+
+  test("is not cacheable", function () {
+    expect(res.getHeader("cache-control")).to.contain("no-store");
+  });
+
+  test("asks not to be indexed", function () {
+    expect(res.getHeader("x-robots-tag")).to.contain("noindex");
+  });
+
+  test("an ordinary paste survives being read", async function () {
+    const again = await bru.sendRequest({
+      method: "GET",
+      url: `${bru.getEnvVar("baseUrl")}/api/pastes/${bru.getVar("pasteId")}`
+    });
+
+    expect(again.status).to.equal(200);
+  });
+}
+
+docs {
+  Reads a paste back. The payload comes out byte-for-byte as it went in — the server
+  stores the string and does nothing to it.
+
+  Two headers matter more than they look:
+
+  - `Cache-Control: no-store` — ciphertext is useless without the key, but a
+    burn-after-reading paste that a proxy or the browser kept a copy of is no longer
+    burned.
+  - `X-Robots-Tag: noindex` — the decryption key rides in the URL fragment, so an
+    indexed link is a published paste.
+
+  The last test re-reads the paste to prove a normal one is not consumed by reading,
+  which is the whole distinction from the burn requests that follow.
+}
