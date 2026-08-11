@@ -40,8 +40,10 @@ public sealed class PastesControllerTests : IAsyncLifetime
         return factory.DisposeAsync();
     }
 
-    private Task<HttpResponseMessage> PostAsync(string payload, int? expiresInSeconds = 3600, bool burn = false)
-        => client.PostAsJsonAsync("/api/pastes", new PastesController.CreatePasteRequest(payload, expiresInSeconds, burn));
+    private Task<HttpResponseMessage> PostAsync(
+        string payload, int? expiresInSeconds = 3600, bool burn = false, bool neverExpires = false)
+        => client.PostAsJsonAsync(
+            "/api/pastes", new PastesController.CreatePasteRequest(payload, expiresInSeconds, burn, neverExpires));
 
     private async Task<PastesController.CreatePasteResponse> CreateAsync(bool burn = false, int expiresInSeconds = 3600)
     {
@@ -181,8 +183,50 @@ public sealed class PastesControllerTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(created);
 
+        // NeverExpires defaults to false, so this path always sets an expiry — assert
+        // that before the arithmetic below, rather than let a hypothetical regression
+        // surface as a NullReferenceException instead of a clear assertion failure.
+        Assert.NotNull(created.ExpiresAt);
+
         // The default is one day; allow slack for the round trip.
-        Assert.InRange(created.ExpiresAt - DateTimeOffset.UtcNow, TimeSpan.FromHours(23), TimeSpan.FromHours(25));
+        Assert.InRange(created.ExpiresAt.Value - DateTimeOffset.UtcNow, TimeSpan.FromHours(23), TimeSpan.FromHours(25));
+    }
+
+    [Fact]
+    public async Task Post_never_expires_when_asked()
+    {
+        var response = await PostAsync(Payload, expiresInSeconds: null, neverExpires: true);
+        var created = await response.Content.ReadFromJsonAsync<PastesController.CreatePasteResponse>(
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(created);
+        Assert.Null(created.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Post_never_expires_ignores_an_out_of_range_expiresInSeconds()
+    {
+        // 99_999_999 seconds is well outside Min/MaxExpiry — on its own this is a 400
+        // (see Post_rejects_an_expiry_outside_the_configured_range). With neverExpires
+        // it must not be, because the duration is not consulted at all in that branch.
+        var response = await PostAsync(Payload, expiresInSeconds: 99_999_999, neverExpires: true);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_of_a_never_expiring_paste_reports_no_expiry()
+    {
+        var createResponse = await PostAsync(Payload, expiresInSeconds: null, neverExpires: true);
+        var created = await createResponse.Content.ReadFromJsonAsync<PastesController.CreatePasteResponse>(
+            TestContext.Current.CancellationToken);
+
+        var paste = await client.GetFromJsonAsync<PastesController.PasteResponse>(
+            $"/api/pastes/{created!.Id}", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(paste);
+        Assert.Null(paste.ExpiresAt);
     }
 
     [Fact]

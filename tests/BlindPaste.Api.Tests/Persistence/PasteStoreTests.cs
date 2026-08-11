@@ -146,6 +146,63 @@ public sealed class PasteStoreTests(PostgresFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateAsync_accepts_a_null_expiry_meaning_never()
+    {
+        await using var db = fixture.CreateDbContext();
+        var store = new PasteStore(db);
+
+        var paste = await store.CreateAsync(Payload, false, expiresAt: null, TestContext.Current.CancellationToken);
+
+        Assert.Null(paste.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task ReadOnceAsync_serves_a_never_expiring_paste()
+    {
+        await using var db = fixture.CreateDbContext();
+        var store = new PasteStore(db);
+
+        var created = await store.CreateAsync(Payload, false, expiresAt: null, TestContext.Current.CancellationToken);
+        var read = await store.ReadOnceAsync(created.Id, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(read);
+        Assert.Equal(Payload, read.Payload);
+        Assert.Null(read.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task ReadOnceAsync_still_burns_a_never_expiring_paste_on_its_one_read()
+    {
+        await using var db = fixture.CreateDbContext();
+        var store = new PasteStore(db);
+
+        var created = await store.CreateAsync(
+            Payload, burnAfterReading: true, expiresAt: null, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(await store.ReadOnceAsync(created.Id, TestContext.Current.CancellationToken));
+        Assert.Null(await store.ReadOnceAsync(created.Id, TestContext.Current.CancellationToken));
+        Assert.Equal(0, await fixture.CountPastesAsync(created.Id));
+    }
+
+    [Fact]
+    public async Task PurgeExpiredAsync_never_deletes_a_paste_with_no_expiry()
+    {
+        await using var db = fixture.CreateDbContext();
+        var store = new PasteStore(db);
+
+        var neverExpires = await store.CreateAsync(
+            Payload, false, expiresAt: null, TestContext.Current.CancellationToken);
+
+        // asOf a century out is the strongest version of this claim: no asOf, however
+        // large, should ever match a null ExpiresAt.
+        var deleted = await store.PurgeExpiredAsync(
+            DateTimeOffset.UtcNow.AddYears(100), TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, deleted);
+        Assert.Equal(1, await fixture.CountPastesAsync(neverExpires.Id));
+    }
+
+    [Fact]
     public async Task PurgeExpiredAsync_deletes_expired_pastes_and_spares_live_ones()
     {
         await using var db = fixture.CreateDbContext();
@@ -153,11 +210,13 @@ public sealed class PasteStoreTests(PostgresFixture fixture) : IAsyncLifetime
 
         var expired = await store.CreateAsync(Payload, false, AlreadyPast, TestContext.Current.CancellationToken);
         var live = await store.CreateAsync(Payload, false, FarFuture, TestContext.Current.CancellationToken);
+        var neverExpires = await store.CreateAsync(Payload, false, null, TestContext.Current.CancellationToken);
 
         var deleted = await store.PurgeExpiredAsync(DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, deleted);
         Assert.Equal(0, await fixture.CountPastesAsync(expired.Id));
         Assert.Equal(1, await fixture.CountPastesAsync(live.Id));
+        Assert.Equal(1, await fixture.CountPastesAsync(neverExpires.Id));
     }
 }

@@ -1,0 +1,85 @@
+meta {
+  name: Create paste that never expires
+  type: http
+  seq: 8
+  tags: [
+    smoke
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/pastes
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "payload": "{{freshPayload}}",
+    "burnAfterReading": false,
+    "neverExpires": true
+  }
+}
+
+vars:post-response {
+  neverExpiresPasteId: res.body.id
+}
+
+assert {
+  res.status: 201
+  res.body.expiresAt: isNull
+}
+
+tests {
+  test("a stored paste with no expiry reports none on read too", async function () {
+    const read = await bru.sendRequest({
+      method: "GET",
+      url: `${bru.getEnvVar("baseUrl")}/api/pastes/${bru.getVar("neverExpiresPasteId")}`
+    });
+
+    expect(read.status).to.equal(200);
+    expect(read.body.expiresAt).to.equal(null);
+  });
+
+  test("neverExpires overrides an expiresInSeconds that would otherwise be rejected", async function () {
+    // 99_999_999 seconds is outside PasteOptions.MaxExpiry — on its own a 400 (see
+    // Validation/Reject expiry above maximum). With neverExpires it must not be,
+    // because that branch of the controller never looks at expiresInSeconds at all.
+    const created = await bru.sendRequest({
+      method: "POST",
+      url: `${bru.getEnvVar("baseUrl")}/api/pastes`,
+      headers: { "content-type": "application/json" },
+      body: {
+        mode: "json",
+        json: {
+          payload: bru.getVar("freshPayload"),
+          expiresInSeconds: 99999999,
+          neverExpires: true
+        }
+      }
+    });
+
+    expect(created.status).to.equal(201);
+    expect(created.body.expiresAt).to.equal(null);
+  });
+}
+
+docs {
+  `neverExpires: true` stores the paste with no expiry at all — `expiresAt` comes back
+  `null` from both the create response and every later read, not a far-future
+  timestamp. The database column is nullable for exactly this
+  (`database/changelog/changesets/0003_paste_expires_at_nullable.sql`); every query
+  that touches it has to say explicitly whether a null counts as "still alive"
+  (`PasteStore.ReadOnceAsync`, `PasteStore.PurgeExpiredAsync`).
+
+  `neverExpires` takes precedence over `expiresInSeconds` when both are sent — it is
+  not a conflict to send a duration that then goes unused, the same way ticking "burn
+  after reading" does not make the other options an error. The second test above is
+  the case that matters: an `expiresInSeconds` that would be a 400 on its own is
+  silently ignored once `neverExpires` is true, because that branch of the controller
+  never evaluates `PasteOptions.MinExpiry`/`MaxExpiry` in the first place.
+
+  Nothing here expires this paste automatically — the sweeper (`ExpiredPasteSweeper`)
+  excludes a null `expires_at` by construction, so this row is permanent unless it was
+  also created with `burnAfterReading: true`.
+}

@@ -5,9 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlindPaste.Api.Persistence;
 
-/// All paste data access. This exists as its own type rather than sitting in the
-/// controller because reading a burn-after-reading paste has a correctness argument
-/// attached to it (see ReadOnceAsync) that deserves somewhere to live.
 public sealed class PasteStore(BlindPasteDbContext db)
 {
     /// 16 bytes — 128 bits, encoding to 22 base64url characters. The id is the only
@@ -18,7 +15,7 @@ public sealed class PasteStore(BlindPasteDbContext db)
     public async Task<Paste> CreateAsync(
         string payload,
         bool burnAfterReading,
-        DateTimeOffset expiresAt,
+        DateTimeOffset? expiresAt,
         CancellationToken cancellationToken)
     {
         var paste = new Paste
@@ -52,7 +49,7 @@ public sealed class PasteStore(BlindPasteDbContext db)
         var now = DateTimeOffset.UtcNow;
 
         var paste = await db.Pastes
-            .Where(p => p.Id == id && p.ExpiresAt > now)
+            .Where(p => p.Id == id && (p.ExpiresAt == null || p.ExpiresAt > now))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (paste is null || !paste.BurnAfterReading)
@@ -61,7 +58,7 @@ public sealed class PasteStore(BlindPasteDbContext db)
         }
 
         var deleted = await db.Pastes
-            .Where(p => p.Id == id && p.BurnAfterReading && p.ExpiresAt > now)
+            .Where(p => p.Id == id && p.BurnAfterReading && (p.ExpiresAt == null || p.ExpiresAt > now))
             .ExecuteDeleteAsync(cancellationToken);
 
         return deleted == 1 ? paste : null;
@@ -69,9 +66,14 @@ public sealed class PasteStore(BlindPasteDbContext db)
 
     /// Deletes everything already past its expiry. Reads filter on expires_at too, so
     /// this controls how long unreadable ciphertext lingers, not whether it is served.
+    ///
+    /// A null ExpiresAt never matches here. Relying on SQL's three-valued logic to
+    /// exclude it implicitly — a NULL compared with a relational operator is neither
+    /// true nor false — would happen to work, but by accident of comparison semantics
+    /// rather than by stating the rule, so the exclusion is explicit instead.
     public Task<int> PurgeExpiredAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
         => db.Pastes
-            .Where(p => p.ExpiresAt <= asOf)
+            .Where(p => p.ExpiresAt != null && p.ExpiresAt <= asOf)
             .ExecuteDeleteAsync(cancellationToken);
 
     private static string NewId()

@@ -16,4 +16,6 @@ docs {
     does not exist. That regression is what this assertion exists to catch.
   - **A burn-after-reading paste is gone the instant it is read**, and the second read is
     an ordinary 404 — indistinguishable from an id that never existed, which is the point.
+  - **`neverExpires: true` reports `expiresAt: null`**, not a far-future timestamp — see
+    "Create paste that never expires".
 }
