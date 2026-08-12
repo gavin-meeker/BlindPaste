@@ -15,8 +15,6 @@ namespace BlindPaste.Api.Persistence;
 /// database/changelog/changesets/.
 public class BlindPasteDbContext(DbContextOptions<BlindPasteDbContext> options) : DbContext(options)
 {
-    public DbSet<Ping> Pings => Set<Ping>();
-
     public DbSet<Paste> Pastes => Set<Paste>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -26,12 +24,6 @@ public class BlindPasteDbContext(DbContextOptions<BlindPasteDbContext> options) 
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
-        builder.Entity<Ping>(e =>
-        {
-            e.ToTable("ping");
-            e.HasKey(x => x.Id);
-        });
-
         builder.Entity<Paste>(e =>
         {
             e.ToTable("paste");

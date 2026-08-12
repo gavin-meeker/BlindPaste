@@ -61,16 +61,26 @@ public sealed class LiquibaseMigrationTests : IAsyncLifetime
 
         // The tables the changesets are supposed to create, plus Liquibase's own
         // tracking table — proof this ran through Liquibase and not some other path.
-        foreach (var table in new[] { "ping", "paste", "databasechangelog" })
+        foreach (var table in new[] { "paste", "databasechangelog" })
         {
-            await using var command = new NpgsqlCommand(
-                "SELECT to_regclass(@table) IS NOT NULL;", connection);
-            command.Parameters.AddWithValue("table", table);
-
             Assert.True(
-                (bool)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!,
+                await TableExistsAsync(connection, table),
                 $"expected table \"{table}\" to exist after migrating.");
         }
+
+        // ping is created by 0001 and dropped by 0004 — this asserts the drop actually
+        // took effect, not just that the migration ran without error.
+        Assert.False(
+            await TableExistsAsync(connection, "ping"),
+            "expected table \"ping\" to have been dropped.");
+    }
+
+    private static async Task<bool> TableExistsAsync(NpgsqlConnection connection, string table)
+    {
+        await using var command = new NpgsqlCommand("SELECT to_regclass(@table) IS NOT NULL;", connection);
+        command.Parameters.AddWithValue("table", table);
+
+        return (bool)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
     }
 
     /// Exercises Liquibase's own tracking table, not the SQL-level idempotence

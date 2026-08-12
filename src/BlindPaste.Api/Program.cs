@@ -18,7 +18,7 @@ var pasteOptions = builder.Configuration
 builder.Services.Configure<PasteOptions>(builder.Configuration.GetSection(PasteOptions.SectionName));
 
 // Keeps [controller]-derived routes lowercase, so the published contract reads
-// /api/ping rather than /api/Ping.
+// /api/pastes rather than /api/Pastes.
 builder.Services.AddRouting(options =>
 {
     options.LowercaseUrls = true;

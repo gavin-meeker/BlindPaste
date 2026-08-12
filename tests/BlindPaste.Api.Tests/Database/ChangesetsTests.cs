@@ -25,17 +25,6 @@ public sealed class ChangesetsTests(PostgresFixture fixture)
         Assert.Equal(before, await SnapshotSchemaAsync());
     }
 
-    /// Seed rows are the easy half of this to get wrong: `CREATE TABLE IF NOT EXISTS`
-    /// is obviously idempotent, a plain INSERT beside it silently is not.
-    [Fact]
-    public async Task Re_applying_changesets_does_not_duplicate_seed_rows()
-    {
-        await fixture.ApplyChangesetsAsync();
-        await fixture.ApplyChangesetsAsync();
-
-        Assert.Equal(1, await ScalarAsync("SELECT count(*) FROM ping;"));
-    }
-
     /// Columns, types, nullability and indexes, as one comparable string.
     private async Task<string> SnapshotSchemaAsync()
     {
@@ -74,15 +63,5 @@ public sealed class ChangesetsTests(PostgresFixture fixture)
         {
             snapshot.AppendLine(reader.GetString(0));
         }
-    }
-
-    private async Task<int> ScalarAsync(string sql)
-    {
-        await using var connection = new NpgsqlConnection(fixture.ConnectionString);
-        await connection.OpenAsync();
-
-        await using var command = new NpgsqlCommand(sql, connection);
-
-        return Convert.ToInt32(await command.ExecuteScalarAsync());
     }
 }
