@@ -1,4 +1,5 @@
 import { CreatePaste } from '@/components/CreatePaste'
+import { GitHubLink } from '@/components/GitHubLink'
 import { ViewPaste } from '@/components/ViewPaste'
 
 // Two screens, so the path is read once rather than routed. There is no client-side
@@ -20,14 +21,17 @@ function App() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-line">
-        <div className={`${SHELL} flex items-baseline justify-between gap-4 py-5`}>
+        <div className={`${SHELL} flex items-center justify-between gap-4 py-5`}>
           <a href="/" className="flex items-baseline gap-2 no-underline">
             <span className="text-lg uppercase tracking-brand text-text">Blind</span>
             <span className="text-lg uppercase tracking-brand text-accent">Paste</span>
           </a>
-          <p className="text-2xs uppercase tracking-label text-muted">
-            Encrypted in your browser
-          </p>
+          <div className="flex items-center gap-5">
+            <p className="text-2xs uppercase tracking-label text-muted">
+              Encrypted in your browser
+            </p>
+            <GitHubLink />
+          </div>
         </div>
       </header>
 

@@ -28,15 +28,11 @@
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
   --font-sans: ui-sans-serif, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
 
-  /* Deliberately smaller than Tailwind's defaults, which are tuned for sans body copy.
-     This UI is dense and monospaced, where the same pixel size reads noticeably larger.
-     Redefining the scale keeps `text-sm` meaningful instead of scattering `text-[12px]`
-     through the markup. */
-  --text-2xs: 0.625rem; /* 10px — micro-labels */
-  --text-xs: 0.6875rem; /* 11px — captions, footnotes */
-  --text-sm: 0.75rem; /* 12px — buttons, controls */
-  --text-base: 0.8125rem; /* 13px — body */
-  --text-lg: 0.9375rem; /* 15px — wordmark, rendered prose */
+  --text-2xs: 0.6875rem; /* 11px — micro-labels */
+  --text-xs: 0.75rem; /* 12px — captions, footnotes */
+  --text-sm: 0.875rem; /* 14px — buttons, controls */
+  --text-base: 0.9375rem; /* 15px — body */
+  --text-lg: 1.125rem; /* 18px — wordmark, rendered prose */
 
   --tracking-ui: 0.12em;
   --tracking-label: 0.18em;
