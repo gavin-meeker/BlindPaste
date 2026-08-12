@@ -1,0 +1,48 @@
+name: Docker Builds
+
+# Path-scoped to the three build contexts together, not one filter per Dockerfile:
+# the matrix below already runs all three in parallel as independent jobs with their
+# own pass/fail status, so a second split — one workflow file per Dockerfile — would
+# add files without adding anything the matrix doesn't already give.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/BlindPaste.Api/**"
+      - "web/**"
+      - "database/**"
+      - ".github/workflows/docker-builds.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/BlindPaste.Api/**"
+      - "web/**"
+      - "database/**"
+      - ".github/workflows/docker-builds.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-builds:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: api
+            dockerfile: src/BlindPaste.Api/Dockerfile
+          - name: web
+            dockerfile: web/Dockerfile
+          - name: liquibase
+            dockerfile: database/liquibase.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      # Proves the exact artifact Railway builds actually builds — every Dockerfile
+      # here uses the repo root as its context, so that is what gets built here too.
+      - run: docker build -f ${{ matrix.dockerfile }} -t blindpaste-${{ matrix.name }} .

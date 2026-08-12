@@ -1,0 +1,50 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "global.json"
+      - "BlindPaste.slnx"
+      - "scripts/test-backend.sh"
+      - ".github/workflows/backend.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "global.json"
+      - "BlindPaste.slnx"
+      - "scripts/test-backend.sh"
+      - ".github/workflows/backend.yml"
+
+permissions:
+  contents: read
+
+# github.workflow (this file's `name:`) keeps this lane independent of the other
+# workflow files — without it, two files sharing the same literal group string would
+# cancel each other's runs instead of only their own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build BlindPaste.slnx --configuration Release
+
+      # Talks to a real Postgres via Testcontainers — needs Docker, which GitHub's
+      # ubuntu-latest runners already have.
+      - name: Test
+        run: ./scripts/test-backend.sh

@@ -1,0 +1,58 @@
+name: API End-to-End
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "database/**"
+      - "bruno/**"
+      - "global.json"
+      - "docker-compose.yml"
+      - "scripts/test-api.sh"
+      - ".github/workflows/api-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "database/**"
+      - "bruno/**"
+      - "global.json"
+      - "docker-compose.yml"
+      - "scripts/test-api.sh"
+      - ".github/workflows/api-e2e.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-e2e:
+    name: Bruno collection against a live API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # `docker compose run` respects the postgres service's `depends_on: condition:
+      # service_healthy` from docker-compose.yml, so this blocks until Postgres is
+      # actually ready before liquibase runs, and blocks again until liquibase exits.
+      - name: Start Postgres and run the migration
+        run: |
+          docker compose up -d postgres
+          docker compose run --rm liquibase
+
+      # Starts the API itself, waits for it, runs the Bruno collection over real HTTP,
+      # tears down after. Excludes the one payload-size case sized for a 4 MB body.
+      - name: Run the Bruno collection against a live API
+        run: ./scripts/test-api.sh --exclude-tags slow
