@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Redaction bars: text with the meaning struck out of it. Reads as the product at a
+       glance, and unlike a letterform it survives being drawn 16px wide.
+
+       Colours are copied from the tokens in src/index.css rather than referenced. A
+       favicon is fetched as a standalone document with no access to the page's stylesheet,
+       so a CSS custom property resolves to nothing here and the shape renders black. If
+       the palette moves, these move by hand.
+
+       The background is opaque on purpose. A transparent icon disappears against browser
+       chrome in one theme or the other, and the ink square keeps the mark legible in
+       both without relying on prefers-color-scheme, which is patchy for favicons. -->
+  <rect width="32" height="32" rx="7" fill="#08090a" />
+  <rect x="6" y="9" width="16" height="4" rx="2" fill="#868d94" />
+  <rect x="6" y="16" width="20" height="4" rx="2" fill="#ffb02e" />
+  <rect x="6" y="23" width="11" height="4" rx="2" fill="#868d94" />
+</svg>

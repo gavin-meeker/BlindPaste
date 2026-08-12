@@ -170,3 +170,36 @@
 .wmde-markdown pre {
   font-family: var(--font-mono);
 }
+
+/* Line length is what makes prose readable, so running text is held to a measure. Blocks
+   that carry structure rather than sentences are released to the full width instead: a
+   wide table or a long command squeezed into 78ch is worse than any long line, and the
+   library already gives `pre > code` its own horizontal scroll, so a narrow column only
+   moves the problem into a scrollbar.
+
+   Per element rather than a wrapper around the whole render, because a wrapper cannot
+   tell a paragraph from a table — it caps both. Headings go full width so the rule
+   beneath them reads as a section divider rather than stopping mid-panel. */
+.wmde-markdown > * {
+  max-width: 78ch;
+}
+
+.wmde-markdown > h1,
+.wmde-markdown > h2,
+.wmde-markdown > h3,
+.wmde-markdown > h4,
+.wmde-markdown > h5,
+.wmde-markdown > h6,
+.wmde-markdown > pre,
+.wmde-markdown > table,
+.wmde-markdown > img,
+.wmde-markdown > hr {
+  max-width: 100%;
+}
+
+/* The library sets `display: block; width: max-content` on tables but never gives them
+   an overflow, so one wider than its container spills past the panel edge instead of
+   scrolling. Block display is what makes this scroll rather than being ignored. */
+.wmde-markdown > table {
+  overflow-x: auto;
+}

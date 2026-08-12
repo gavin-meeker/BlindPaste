@@ -59,6 +59,7 @@ export function ViewPaste({ id }: { id: string }) {
   const [passphrase, setPassphrase] = useState('')
   const [needsPassphrase, setNeedsPassphrase] = useState(false)
   const [decryptError, setDecryptError] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const attempt = useCallback(
     async (payload: string, candidate: string) => {
@@ -173,10 +174,6 @@ export function ViewPaste({ id }: { id: string }) {
           </p>
         )}
 
-        {/* Without this the screen is a dead end: someone who does not have the
-            passphrase has no way out but the back button. Every other state here
-            offers the same exit. It is an <a>, not a <button>, so it navigates
-            instead of submitting the form around it. */}
         <p className="mt-8 border-t border-line pt-6">
           <a className={button} href="/">
             Create a paste
@@ -198,23 +195,20 @@ export function ViewPaste({ id }: { id: string }) {
     return <p className="text-xs uppercase tracking-label text-muted">Decrypting…</p>
   }
 
-  // Hands the already-decrypted text to a fresh create form. This never touches the
-  // server or re-derives anything cryptographic — it is a plain string handoff between
-  // two screens in the same browser. See lib/draft.ts for why that handoff goes through
-  // sessionStorage rather than the URL or component state.
-  //
-  // An arrow function bound to `const`, not `function`: TS narrows `text` to `string`
-  // (from `string | null`) across a const closure but not across a hoisted function
-  // declaration, so the latter would force a non-null assertion here for no real reason
-  // — the null case was already excluded by the check just above.
   const reuseAsNewPaste = () => {
     saveDraft(text)
     window.location.assign('/')
   }
 
+  const copyMarkdown = async () => {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1600)
+  }
+
   return (
     <article className="animate-reveal">
-      <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-xs uppercase tracking-label text-muted">Paste</h1>
         <p className="text-xs text-muted">
           Created {new Date(paste.createdAt).toLocaleString()}
@@ -223,6 +217,10 @@ export function ViewPaste({ id }: { id: string }) {
         </p>
       </div>
 
+      {/* Ahead of the controls, not after them: this is the one irreversible fact on the
+          screen, and it is what makes "Reuse this content" worth reaching for. A reader
+          who meets the buttons first has already been asked to choose before being told
+          the paste is gone. */}
       {paste.burnAfterReading && (
         <p
           role="alert"
@@ -234,36 +232,22 @@ export function ViewPaste({ id }: { id: string }) {
         </p>
       )}
 
-      {/* The panel spans the wide shell so tables and code blocks have room, but the
-          prose inside is capped at a readable measure — line length is what makes body
-          text comfortable, and 1100px of it would not be. */}
-      <div className={`${panel} p-6 sm:p-8`} data-color-mode="dark">
-        <div className="max-w-[78ch]">
-          <MDEditor.Markdown source={text} rehypePlugins={MARKDOWN_PLUGINS} />
-        </div>
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        <button className={buttonPrimary} onClick={() => void copyMarkdown()}>
+          {copied ? 'Copied' : 'Copy markdown'}
+        </button>
+        <a className={button} href="/">
+          Create blank paste
+        </a>
+        <button className={button} onClick={reuseAsNewPaste}>
+          Reuse as new paste
+        </button>
       </div>
 
-      {/* Each caption sits beside its own button rather than below both, on purpose —
-          a shared caption under two buttons reads as describing whichever one the eye
-          lands on, and here the two do very different things: one is blank, one is
-          not. Proximity does the disambiguating instead of wording alone. */}
-      <div className="mt-6 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <a className={button} href="/">
-            Create a paste
-          </a>
-          <p className="text-xs text-muted">Start over with a blank paste.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button className={button} onClick={reuseAsNewPaste}>
-            Reuse this content
-          </button>
-          <p className="max-w-md text-xs text-muted">
-            Opens a blank paste with this text already in the editor. New link, new key
-            — this paste is not changed, extended, or un-burned by it.
-          </p>
-        </div>
+      <div className={`${panel} p-6 sm:p-8`} data-color-mode="dark">
+        <MDEditor.Markdown source={text} rehypePlugins={MARKDOWN_PLUGINS} />
       </div>
+
     </article>
   )
 }

@@ -7,9 +7,6 @@ import { takeDraft } from '@/lib/draft'
 import { MARKDOWN_PLUGINS } from '@/lib/markdown'
 import { button, buttonPrimary, field, label, panel } from '@/styles/ui'
 
-// Durations are kept inside the API's configured range (min 1 minute, max 30 days).
-// `seconds: null` is "Never" — a distinct request to the API (neverExpires: true), not
-// a very large duration, so it is exempt from that range rather than pushing on it.
 const EXPIRY_OPTIONS: { label: string; seconds: number | null }[] = [
   { label: 'Never', seconds: null },
   { label: '1 hour', seconds: 3600 },
@@ -22,6 +19,8 @@ const EXPIRY_OPTIONS: { label: string; seconds: number | null }[] = [
 // back to its text content — workable, but a foot-gun the moment a label changes. A
 // dedicated sentinel keeps "never" explicit at every point it is handled.
 const NEVER_VALUE = 'never'
+
+const EDITOR_BREAKOUT = 'mx-[calc((min(96rem,100vw_-_3rem)_-_100%)_/_-2)]'
 
 function toOptionValue(seconds: number | null): string {
   return seconds === null ? NEVER_VALUE : String(seconds)
@@ -159,7 +158,7 @@ export function CreatePaste() {
 
   return (
     <form onSubmit={submit} className="animate-reveal">
-      <div className="mb-6">
+      <div className={`mb-6 ${EDITOR_BREAKOUT}`}>
         <span className={label}>Text — markdown</span>
         <div data-color-mode="dark">
           <MDEditor
@@ -229,8 +228,6 @@ export function CreatePaste() {
       </label>
 
       <div className="flex items-center gap-4">
-        {/* The editor is not a form control, so `required` no longer applies — the
-            empty case has to be refused here instead. */}
         <button type="submit" className={buttonPrimary} disabled={busy || text.trim() === ''}>
           {busy ? 'Encrypting…' : 'Encrypt and create'}
         </button>
