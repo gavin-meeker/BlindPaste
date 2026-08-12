@@ -28,9 +28,11 @@ public class PastesController(PasteStore store, IOptions<PasteOptions> options) 
         bool BurnAfterReading,
         bool NeverExpires = false);
 
-    public record CreatePasteResponse(string Id, DateTimeOffset? ExpiresAt, bool BurnAfterReading);
+    public record CreatePasteResponse(
+        string Id, DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt, bool BurnAfterReading);
 
-    public record PasteResponse(string Payload, DateTimeOffset? ExpiresAt, bool BurnAfterReading);
+    public record PasteResponse(
+        string Payload, DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt, bool BurnAfterReading);
 
     [HttpPost]
     [EnableRateLimiting(RateLimiterPolicies.CreatePaste)]
@@ -102,7 +104,9 @@ public class PastesController(PasteStore store, IOptions<PasteOptions> options) 
         // whole generated path — route values included — and a paste id is
         // case-sensitive base64url, so a generated Location points at an id that does
         // not exist. Keep this literal, or verify the header still resolves.
-        return Created($"/api/pastes/{paste.Id}", new CreatePasteResponse(paste.Id, paste.ExpiresAt, paste.BurnAfterReading));
+        return Created(
+            $"/api/pastes/{paste.Id}",
+            new CreatePasteResponse(paste.Id, paste.CreatedAt, paste.ExpiresAt, paste.BurnAfterReading));
     }
 
     [HttpGet("{id}")]
@@ -121,6 +125,6 @@ public class PastesController(PasteStore store, IOptions<PasteOptions> options) 
         // proxy or the browser kept a copy of is no longer burned.
         Response.Headers.CacheControl = "no-store";
 
-        return Ok(new PasteResponse(paste.Payload, paste.ExpiresAt, paste.BurnAfterReading));
+        return Ok(new PasteResponse(paste.Payload, paste.CreatedAt, paste.ExpiresAt, paste.BurnAfterReading));
     }
 }

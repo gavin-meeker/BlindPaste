@@ -217,6 +217,8 @@ export function ViewPaste({ id }: { id: string }) {
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-xs uppercase tracking-label text-muted">Paste</h1>
         <p className="text-xs text-muted">
+          Created {new Date(paste.createdAt).toLocaleString()}
+          {' · '}
           {paste.expiresAt === null ? 'Never expires' : `Expires ${new Date(paste.expiresAt).toLocaleString()}`}
         </p>
       </div>

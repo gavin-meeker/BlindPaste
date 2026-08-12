@@ -25,6 +25,7 @@ export class ApiError extends Error {
 
 export type CreatePasteResult = {
   id: string
+  createdAt: string
   /** Null means the paste never expires. */
   expiresAt: string | null
   burnAfterReading: boolean
@@ -32,6 +33,7 @@ export type CreatePasteResult = {
 
 export type Paste = {
   payload: string
+  createdAt: string
   /** Null means the paste never expires. */
   expiresAt: string | null
   burnAfterReading: boolean

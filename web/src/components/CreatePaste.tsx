@@ -11,11 +11,11 @@ import { button, buttonPrimary, field, label, panel } from '@/styles/ui'
 // `seconds: null` is "Never" — a distinct request to the API (neverExpires: true), not
 // a very large duration, so it is exempt from that range rather than pushing on it.
 const EXPIRY_OPTIONS: { label: string; seconds: number | null }[] = [
+  { label: 'Never', seconds: null },
   { label: '1 hour', seconds: 3600 },
   { label: '1 day', seconds: 86_400 },
   { label: '7 days', seconds: 604_800 },
   { label: '30 days', seconds: 2_592_000 },
-  { label: 'Never', seconds: null },
 ]
 
 // <select> values are strings, and React represents an <option value={null}> by falling
@@ -37,9 +37,10 @@ type Created = {
 export function CreatePaste() {
   const [text, setText] = useState('')
   const [passphrase, setPassphrase] = useState('')
-  // Defaults to '1 day', not 'Never' — an expiring paste is the safer mistake to make.
-  // Never-expiring has to be chosen, not landed on.
-  const [expiresInSeconds, setExpiresInSeconds] = useState<number | null>(EXPIRY_OPTIONS[1].seconds)
+  // `null` directly, not an index into EXPIRY_OPTIONS: indexing assumes a fixed
+  // position in that array, and it's what silently changed the old default from
+  // '1 day' to '1 hour' the moment 'Never' moved to the front of the list.
+  const [expiresInSeconds, setExpiresInSeconds] = useState<number | null>(null)
   const [burnAfterReading, setBurnAfterReading] = useState(false)
 
   const [created, setCreated] = useState<Created | null>(null)
@@ -158,8 +159,6 @@ export function CreatePaste() {
 
   return (
     <form onSubmit={submit} className="animate-reveal">
-      <h1 className="mb-6 text-xs uppercase tracking-label text-muted">New paste</h1>
-
       <div className="mb-6">
         <span className={label}>Text — markdown</span>
         <div data-color-mode="dark">
