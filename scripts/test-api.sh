@@ -59,7 +59,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-log="$(mktemp -t blindpaste-api)"
+log="$(mktemp "${TMPDIR:-/tmp}/blindpaste-api.XXXXXX")"
 echo "test-api: starting the API on $URL"
 
 ASPNETCORE_ENVIRONMENT=Development \
